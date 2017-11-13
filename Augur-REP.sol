@@ -1,379 +1,352 @@
-// Contract of EOS Token
-// https://etherscan.io/address/0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0#code
+// Contract of Augur REP token
+// https://etherscan.io/address/0xe94327d07fc17907b4db788e5adf2ed424addff6#code
 
-contract DSNote {
-    event LogNote(
-        bytes4   indexed  sig,
-        address  indexed  guy,
-        bytes32  indexed  foo,
-        bytes32  indexed  bar,
-	uint	 	  wad,
-        bytes             fax
-    ) anonymous;
+pragma solidity ^0.4.11;
 
-    modifier note {
-        bytes32 foo;
-        bytes32 bar;
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that throw on error
+ */
+library SafeMath {
+  function mul(uint256 a, uint256 b) internal constant returns (uint256) {
+    uint256 c = a * b;
+    assert(a == 0 || c / a == b);
+    return c;
+  }
 
-        assembly {
-            foo := calldataload(4)
-            bar := calldataload(36)
-        }
+  function div(uint256 a, uint256 b) internal constant returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
 
-        LogNote(msg.sig, msg.sender, foo, bar, msg.value, msg.data);
+  function sub(uint256 a, uint256 b) internal constant returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
 
-        _;
-    }
+  function add(uint256 a, uint256 b) internal constant returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
 }
 
-contract DSAuthority {
-    function canCall(
-        address src, address dst, bytes4 sig
-    ) constant returns (bool);
+
+/**
+ * @title ERC20Basic
+ * @dev Simpler version of ERC20 interface
+ * @dev see https://github.com/ethereum/EIPs/issues/179
+ */
+contract ERC20Basic {
+  uint256 public totalSupply;
+  function balanceOf(address who) constant returns (uint256);
+  function transfer(address to, uint256 value) returns (bool);
+  event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-contract DSAuthEvents {
-    event LogSetAuthority (address indexed authority);
-    event LogSetOwner     (address indexed owner);
+
+/**
+ * @title ERC20 interface
+ * @dev see https://github.com/ethereum/EIPs/issues/20
+ */
+contract ERC20 is ERC20Basic {
+  function allowance(address owner, address spender) constant returns (uint256);
+  function transferFrom(address from, address to, uint256 value) returns (bool);
+  function approve(address spender, uint256 value) returns (bool);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract DSAuth is DSAuthEvents {
-    DSAuthority  public  authority;
-    address      public  owner;
 
-    function DSAuth() {
-        owner = msg.sender;
-        LogSetOwner(msg.sender);
-    }
+/**
+ * @title Basic token
+ * @dev Basic version of StandardToken, with no allowances.
+ */
+contract BasicToken is ERC20Basic {
+  using SafeMath for uint256;
 
-    function setOwner(address owner_)
-        auth
-    {
-        owner = owner_;
-        LogSetOwner(owner);
-    }
+  mapping(address => uint256) balances;
 
-    function setAuthority(DSAuthority authority_)
-        auth
-    {
-        authority = authority_;
-        LogSetAuthority(authority);
-    }
+  /**
+  * @dev transfer token for a specified address
+  * @param _to The address to transfer to.
+  * @param _value The amount to be transferred.
+  */
+  function transfer(address _to, uint256 _value) returns (bool) {
+    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    Transfer(msg.sender, _to, _value);
+    return true;
+  }
 
-    modifier auth {
-        assert(isAuthorized(msg.sender, msg.sig));
-        _;
-    }
-
-    modifier authorized(bytes4 sig) {
-        assert(isAuthorized(msg.sender, sig));
-        _;
-    }
-
-    function isAuthorized(address src, bytes4 sig) internal returns (bool) {
-        if (src == address(this)) {
-            return true;
-        } else if (src == owner) {
-            return true;
-        } else if (authority == DSAuthority(0)) {
-            return false;
-        } else {
-            return authority.canCall(src, this, sig);
-        }
-    }
-
-    function assert(bool x) internal {
-        if (!x) throw;
-    }
-}
-
-contract DSStop is DSAuth, DSNote {
-
-    bool public stopped;
-
-    modifier stoppable {
-        assert (!stopped);
-        _;
-    }
-    function stop() auth note {
-        stopped = true;
-    }
-    function start() auth note {
-        stopped = false;
-    }
+  /**
+  * @dev Gets the balance of the specified address.
+  * @param _owner The address to query the the balance of.
+  * @return An uint256 representing the amount owned by the passed address.
+  */
+  function balanceOf(address _owner) constant returns (uint256 balance) {
+    return balances[_owner];
+  }
 
 }
 
-contract DSMath {
 
-    /*
-    standard uint256 functions
-     */
+/**
+ * @title Standard ERC20 token
+ *
+ * @dev Implementation of the basic standard token.
+ * @dev https://github.com/ethereum/EIPs/issues/20
+ * @dev Based on code by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
+ */
+contract StandardToken is ERC20, BasicToken {
 
-    function add(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        assert((z = x + y) >= x);
-    }
-
-    function sub(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        assert((z = x - y) <= x);
-    }
-
-    function mul(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        assert((z = x * y) >= x);
-    }
-
-    function div(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        z = x / y;
-    }
-
-    function min(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        return x <= y ? x : y;
-    }
-    function max(uint256 x, uint256 y) constant internal returns (uint256 z) {
-        return x >= y ? x : y;
-    }
-
-    /*
-    uint128 functions (h is for half)
-     */
+  mapping (address => mapping (address => uint256)) allowed;
 
 
-    function hadd(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        assert((z = x + y) >= x);
-    }
+  /**
+   * @dev Transfer tokens from one address to another
+   * @param _from address The address which you want to send tokens from
+   * @param _to address The address which you want to transfer to
+   * @param _value uint256 the amout of tokens to be transfered
+   */
+  function transferFrom(address _from, address _to, uint256 _value) returns (bool) {
+    var _allowance = allowed[_from][msg.sender];
 
-    function hsub(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        assert((z = x - y) <= x);
-    }
+    // Check is not needed because sub(_allowance, _value) will already throw if this condition is not met
+    // require (_value <= _allowance);
 
-    function hmul(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        assert((z = x * y) >= x);
-    }
+    balances[_to] = balances[_to].add(_value);
+    balances[_from] = balances[_from].sub(_value);
+    allowed[_from][msg.sender] = _allowance.sub(_value);
+    Transfer(_from, _to, _value);
+    return true;
+  }
 
-    function hdiv(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        z = x / y;
-    }
+  /**
+   * @dev Aprove the passed address to spend the specified amount of tokens on behalf of msg.sender.
+   * @param _spender The address which will spend the funds.
+   * @param _value The amount of tokens to be spent.
+   */
+  function approve(address _spender, uint256 _value) returns (bool) {
 
-    function hmin(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        return x <= y ? x : y;
-    }
-    function hmax(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        return x >= y ? x : y;
-    }
+    // To change the approve amount you first have to reduce the addresses`
+    //  allowance to zero by calling `approve(_spender, 0)` if it is not
+    //  already 0 to mitigate the race condition described here:
+    //  https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+    require((_value == 0) || (allowed[msg.sender][_spender] == 0));
 
+    allowed[msg.sender][_spender] = _value;
+    Approval(msg.sender, _spender, _value);
+    return true;
+  }
 
-    /*
-    int256 functions
-     */
-
-    function imin(int256 x, int256 y) constant internal returns (int256 z) {
-        return x <= y ? x : y;
-    }
-    function imax(int256 x, int256 y) constant internal returns (int256 z) {
-        return x >= y ? x : y;
-    }
-
-    /*
-    WAD math
-     */
-
-    uint128 constant WAD = 10 ** 18;
-
-    function wadd(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hadd(x, y);
-    }
-
-    function wsub(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hsub(x, y);
-    }
-
-    function wmul(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        z = cast((uint256(x) * y + WAD / 2) / WAD);
-    }
-
-    function wdiv(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        z = cast((uint256(x) * WAD + y / 2) / y);
-    }
-
-    function wmin(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hmin(x, y);
-    }
-    function wmax(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hmax(x, y);
-    }
-
-    /*
-    RAY math
-     */
-
-    uint128 constant RAY = 10 ** 27;
-
-    function radd(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hadd(x, y);
-    }
-
-    function rsub(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hsub(x, y);
-    }
-
-    function rmul(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        z = cast((uint256(x) * y + RAY / 2) / RAY);
-    }
-
-    function rdiv(uint128 x, uint128 y) constant internal returns (uint128 z) {
-        z = cast((uint256(x) * RAY + y / 2) / y);
-    }
-
-    function rpow(uint128 x, uint64 n) constant internal returns (uint128 z) {
-        // This famous algorithm is called "exponentiation by squaring"
-        // and calculates x^n with x as fixed-point and n as regular unsigned.
-        //
-        // It's O(log n), instead of O(n) for naive repeated multiplication.
-        //
-        // These facts are why it works:
-        //
-        //  If n is even, then x^n = (x^2)^(n/2).
-        //  If n is odd,  then x^n = x * x^(n-1),
-        //   and applying the equation for even x gives
-        //    x^n = x * (x^2)^((n-1) / 2).
-        //
-        //  Also, EVM division is flooring and
-        //    floor[(n-1) / 2] = floor[n / 2].
-
-        z = n % 2 != 0 ? x : RAY;
-
-        for (n /= 2; n != 0; n /= 2) {
-            x = rmul(x, x);
-
-            if (n % 2 != 0) {
-                z = rmul(z, x);
-            }
-        }
-    }
-
-    function rmin(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hmin(x, y);
-    }
-    function rmax(uint128 x, uint128 y) constant internal returns (uint128) {
-        return hmax(x, y);
-    }
-
-    function cast(uint256 x) constant internal returns (uint128 z) {
-        assert((z = uint128(x)) == x);
-    }
+  /**
+   * @dev Function to check the amount of tokens that an owner allowed to a spender.
+   * @param _owner address The address which owns the funds.
+   * @param _spender address The address which will spend the funds.
+   * @return A uint256 specifing the amount of tokens still avaible for the spender.
+   */
+  function allowance(address _owner, address _spender) constant returns (uint256 remaining) {
+    return allowed[_owner][_spender];
+  }
 
 }
 
-contract ERC20 {
-    function totalSupply() constant returns (uint supply);
-    function balanceOf( address who ) constant returns (uint value);
-    function allowance( address owner, address spender ) constant returns (uint _allowance);
 
-    function transfer( address to, uint value) returns (bool ok);
-    function transferFrom( address from, address to, uint value) returns (bool ok);
-    function approve( address spender, uint value ) returns (bool ok);
+/**
+ * @title Ownable
+ * @dev The Ownable contract has an owner address, and provides basic authorization control
+ * functions, this simplifies the implementation of "user permissions".
+ */
+contract Ownable {
+  address public owner;
 
-    event Transfer( address indexed from, address indexed to, uint value);
-    event Approval( address indexed owner, address indexed spender, uint value);
-}
 
-contract DSTokenBase is ERC20, DSMath {
-    uint256                                            _supply;
-    mapping (address => uint256)                       _balances;
-    mapping (address => mapping (address => uint256))  _approvals;
+  /**
+   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+   * account.
+   */
+  function Ownable() {
+    owner = msg.sender;
+  }
 
-    function DSTokenBase(uint256 supply) {
-        _balances[msg.sender] = supply;
-        _supply = supply;
+
+  /**
+   * @dev Throws if called by any account other than the owner.
+   */
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
+
+
+  /**
+   * @dev Allows the current owner to transfer control of the contract to a newOwner.
+   * @param newOwner The address to transfer ownership to.
+   */
+  function transferOwnership(address newOwner) onlyOwner {
+    if (newOwner != address(0)) {
+      owner = newOwner;
     }
-
-    function totalSupply() constant returns (uint256) {
-        return _supply;
-    }
-    function balanceOf(address src) constant returns (uint256) {
-        return _balances[src];
-    }
-    function allowance(address src, address guy) constant returns (uint256) {
-        return _approvals[src][guy];
-    }
-
-    function transfer(address dst, uint wad) returns (bool) {
-        assert(_balances[msg.sender] >= wad);
-
-        _balances[msg.sender] = sub(_balances[msg.sender], wad);
-        _balances[dst] = add(_balances[dst], wad);
-
-        Transfer(msg.sender, dst, wad);
-
-        return true;
-    }
-
-    function transferFrom(address src, address dst, uint wad) returns (bool) {
-        assert(_balances[src] >= wad);
-        assert(_approvals[src][msg.sender] >= wad);
-
-        _approvals[src][msg.sender] = sub(_approvals[src][msg.sender], wad);
-        _balances[src] = sub(_balances[src], wad);
-        _balances[dst] = add(_balances[dst], wad);
-
-        Transfer(src, dst, wad);
-
-        return true;
-    }
-
-    function approve(address guy, uint256 wad) returns (bool) {
-        _approvals[msg.sender][guy] = wad;
-
-        Approval(msg.sender, guy, wad);
-
-        return true;
-    }
+  }
 
 }
 
-contract DSToken is DSTokenBase(0), DSStop {
 
-    bytes32  public  symbol;
-    uint256  public  decimals = 18; // standard token precision. override to customize
+/**
+ * @title Pausable
+ * @dev Base contract which allows children to implement an emergency stop mechanism.
+ */
+contract Pausable is Ownable {
+  event Pause();
+  event Unpause();
 
-    function DSToken(bytes32 symbol_) {
-        symbol = symbol_;
+  bool public paused = false;
+
+
+  /**
+   * @dev modifier to allow actions only when the contract IS paused
+   */
+  modifier whenNotPaused() {
+    require(!paused);
+    _;
+  }
+
+  /**
+   * @dev modifier to allow actions only when the contract IS NOT paused
+   */
+  modifier whenPaused {
+    require(paused);
+    _;
+  }
+
+  /**
+   * @dev called by the owner to pause, triggers stopped state
+   */
+  function pause() onlyOwner whenNotPaused returns (bool) {
+    paused = true;
+    Pause();
+    return true;
+  }
+
+  /**
+   * @dev called by the owner to unpause, returns to normal state
+   */
+  function unpause() onlyOwner whenPaused returns (bool) {
+    paused = false;
+    Unpause();
+    return true;
+  }
+}
+
+/**
+ * Pausable token
+ *
+ * Simple ERC20 Token example, with pausable token creation
+ **/
+
+contract PausableToken is StandardToken, Pausable {
+
+  function transfer(address _to, uint _value) whenNotPaused returns (bool) {
+    return super.transfer(_to, _value);
+  }
+
+  function transferFrom(address _from, address _to, uint _value) whenNotPaused returns (bool) {
+    return super.transferFrom(_from, _to, _value);
+  }
+}
+
+
+contract Initializable {
+  bool public initialized = false;
+
+  modifier afterInitialized {
+    require(initialized);
+    _;
+  }
+
+  modifier beforeInitialized {
+    require(!initialized);
+    _;
+  }
+
+  function endInitialization() internal beforeInitialized returns (bool) {
+    initialized = true;
+    return true;
+  }
+}
+
+
+/**
+ * @title REP2 Token
+ * @dev REP2 Mintable Token with migration from legacy contract
+ */
+contract RepToken is Initializable, PausableToken {
+  ERC20Basic public legacyRepContract;
+  uint256 public targetSupply;
+
+  string public constant name = "Reputation";
+  string public constant symbol = "REP";
+  uint256 public constant decimals = 18;
+
+  event Migrated(address indexed holder, uint256 amount);
+
+  /**
+    * @dev Creates a new RepToken instance
+    * @param _legacyRepContract Address of the legacy ERC20Basic REP contract to migrate balances from
+    */
+  function RepToken(address _legacyRepContract, uint256 _amountUsedToFreeze, address _accountToSendFrozenRepTo) {
+    require(_legacyRepContract != 0);
+    legacyRepContract = ERC20Basic(_legacyRepContract);
+    targetSupply = legacyRepContract.totalSupply();
+    balances[_accountToSendFrozenRepTo] = _amountUsedToFreeze;
+    totalSupply = _amountUsedToFreeze;
+    pause();
+  }
+
+  /**
+    * @dev Copies the balance of a batch of addresses from the legacy contract
+    * @param _holders Array of addresses to migrate balance
+    * @return True if operation was completed
+    */
+  function migrateBalances(address[] _holders) onlyOwner beforeInitialized returns (bool) {
+    for (uint256 i = 0; i < _holders.length; i++) {
+      migrateBalance(_holders[i]);
+    }
+    return true;
+  }
+
+  /**
+    * @dev Copies the balance of a single addresses from the legacy contract
+    * @param _holder Address to migrate balance
+    * @return True if balance was copied, false if was already copied or address had no balance
+    */
+  function migrateBalance(address _holder) onlyOwner beforeInitialized returns (bool) {
+    if (balances[_holder] > 0) {
+      return false; // Already copied, move on
     }
 
-    function transfer(address dst, uint wad) stoppable note returns (bool) {
-        return super.transfer(dst, wad);
-    }
-    function transferFrom(
-        address src, address dst, uint wad
-    ) stoppable note returns (bool) {
-        return super.transferFrom(src, dst, wad);
-    }
-    function approve(address guy, uint wad) stoppable note returns (bool) {
-        return super.approve(guy, wad);
+    uint256 amount = legacyRepContract.balanceOf(_holder);
+    if (amount == 0) {
+      return false; // Has no balance in legacy contract, move on
     }
 
-    function push(address dst, uint128 wad) returns (bool) {
-        return transfer(dst, wad);
-    }
-    function pull(address src, uint128 wad) returns (bool) {
-        return transferFrom(src, msg.sender, wad);
-    }
+    balances[_holder] = amount;
+    totalSupply = totalSupply.add(amount);
+    Migrated(_holder, amount);
 
-    function mint(uint128 wad) auth stoppable note {
-        _balances[msg.sender] = add(_balances[msg.sender], wad);
-        _supply = add(_supply, wad);
+    if (targetSupply == totalSupply) {
+      endInitialization();
     }
-    function burn(uint128 wad) auth stoppable note {
-        _balances[msg.sender] = sub(_balances[msg.sender], wad);
-        _supply = sub(_supply, wad);
-    }
+    return true;
+  }
 
-    // Optional token name
-
-    bytes32   public  name = "";
-
-    function setName(bytes32 name_) auth {
-        name = name_;
-    }
-
+  /**
+    * @dev Unpauses the contract with the caveat added that it can only happen after initialization.
+    */
+  function unpause() onlyOwner whenPaused afterInitialized returns (bool) {
+    super.unpause();
+    return true;
+  }
 }
